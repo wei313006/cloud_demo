@@ -1,0 +1,16 @@
+server:
+  port: 9095
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+
+minio:
+  url: http://192.168.171.131:9000
+  access-key: G5E1GqjkPteVNennHDtu
+  secret-key: be2pivdKTtmRBdKYdzFzfxy1F4xnPb4XDDUuFpwI
+  bucket-name: cloud-demo
+
+

@@ -1,0 +1,38 @@
+server:
+  port: 9090
+
+spring:
+  main:
+    web-application-type: reactive
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        enabled: true
+    gateway:
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/auth/**
+
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/user/**
+
+        - id: file-service
+          uri: lb://file-service
+          predicates:
+            - Path=/files/**
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      lettuce:
+        pool:
+          max-active: 30
+          max-idle: 10
+          max-wait: 10000
+          min-idle: 10
+      database: 4

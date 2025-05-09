@@ -1,0 +1,12 @@
+/user-service/target/
+/common-core/target/
+/common-security/target/
+/common-datasource/target/
+/search-service/target/
+/norify-service/target/
+/gateway/target/
+/auth-service/target/
+/file-service/target/
+/.idea/
+/.log/
+/.git/

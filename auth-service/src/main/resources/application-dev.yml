@@ -1,0 +1,41 @@
+server:
+  port: 9093
+
+spring:
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      lettuce:
+        pool:
+          max-active: 30
+          max-idle: 10
+          max-wait: 10000
+          min-idle: 10
+      database: 4
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+
+#  security:
+#    oauth2:
+#      client:
+#        registration:
+#          github:
+#            client-id: Ov23liRM9V2Huo6SMXze
+#            client-secret: 068316c47558fa19ce3c708eeba1dec747a5dcb1
+#            scope: user:email,repo      #权限范围
+#            redirect-uri: http://localhost:9090/login/oauth2/code/github
+#            authorization-grant-type: authorization_code
+#        provider:
+#          github:
+#            authorization-uri: https://github.com/login/oauth/authorize
+#            token-uri: https://github.com/login/oauth/access_token
+#            user-info-uri: https://api.github.com/user
+
+easy-captcha:
+  height: 40
+  width: 130
+  captcha: gif
+  length: 5
