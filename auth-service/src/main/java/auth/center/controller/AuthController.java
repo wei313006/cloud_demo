@@ -1,13 +1,14 @@
 package auth.center.controller;
 
-import auth.center.clients.UserClient;
 import common.core.annotation.SysLog;
 import common.core.entity.RedisHeaders;
 import common.core.entity.Resp;
 import common.core.entity.StatusCode;
+import common.core.entity.dto.AuthUserDTO;
 import common.core.utils.GetClientIp;
 import common.core.utils.JsonUtils;
-import common.security.entity.TokenDTO;
+import common.core.entity.dto.TokenDTO;
+import common.feign.clients.UserClient;
 import io.github.eternalstone.captcha.gp.base.Captcha;
 import io.github.eternalstone.captcha.gp.base.TextEntry;
 import io.github.eternalstone.captcha.gp.captcha.GifCaptcha;
@@ -16,7 +17,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import common.security.entity.AuthUserDTO;
 import common.security.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -67,6 +67,7 @@ public class AuthController {
 
         if (Objects.isNull(authenticatedCache)) {
             Resp<AuthUserDTO> resp = userClient.login(authUserDTO);
+            log.warn(String.valueOf(resp));
             if (!Objects.equals(resp.getCode(), StatusCode.SELECT_SUCCESS)) {
                 return Resp.error(resp.getMsg(), StatusCode.SELECT_ERR);
             }

@@ -8,8 +8,8 @@
         <version>3.2.4</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>common-security</groupId>
-    <artifactId>common-security</artifactId>
+    <groupId>common-feign</groupId>
+    <artifactId>common-feign</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <properties>
         <java.version>17</java.version>
@@ -17,35 +17,15 @@
 
     <dependencies>
 
-        <!-- 必须：Spring Security 核心 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
-        </dependency>
-
-        <!-- 可选：仅在需要 Servlet API 时添加 -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-            <scope>provided</scope> <!-- 表示由主模块提供运行时依赖 -->
+            <artifactId>spring-boot-starter</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt</artifactId>
-            <version>0.9.1</version>  <!-- 旧版本不兼容 Spring Boot 3 -->
-        </dependency>
-        <!--            要加这个包-->
-        <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-            <version>2.3.0</version>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <version>4.2.1</version>
         </dependency>
 
         <dependency>
@@ -55,9 +35,8 @@
         </dependency>
 
         <dependency>
-            <groupId>common-feign</groupId>
-            <artifactId>common-feign</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
         </dependency>
 
     </dependencies>

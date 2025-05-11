@@ -1,4 +1,4 @@
-package common.security.entity;
+package common.core.entity.dto;
 
 import lombok.Data;
 

@@ -7,9 +7,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import common.core.entity.RedisHeaders;
 import common.core.entity.Resp;
 import common.core.entity.StatusCode;
+import common.core.entity.dto.AuthUserDTO;
 import common.core.utils.JsonUtils;
-import common.security.entity.AuthUserDTO;
-import common.security.entity.TokenDTO;
+import common.core.entity.dto.TokenDTO;
 import gateway.clients.WebClientService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,7 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -36,7 +36,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author abing
@@ -48,12 +47,8 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class GlobalAuthFilter implements GlobalFilter, Ordered {
 
-
-//    @Resource
-//    private AuthClient authClient;
-
     @Autowired
-    private StringRedisTemplate redisTemplate;
+    private ReactiveStringRedisTemplate redisTemplate; // 改为响应式模板
 
     @Resource
     private WebClientService webClientService;
@@ -65,136 +60,154 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-
         ServerHttpRequest request = exchange.getRequest();
-//        request.mutate().header(SecurityHeaders.AUTHENTICATED, "true");
+
+        // 预检请求直接放行
         if (HttpMethod.OPTIONS.matches(request.getMethod().toString())) {
             return chain.filter(exchange);
         }
 
+        // 白名单检查
         if (whiteList.stream().anyMatch(request.getURI().getPath()::startsWith)) {
             return chain.filter(exchange);
         }
 
-        String uuid = extractToken(exchange.getRequest());
-
+        String uuid = extractToken(request);
         if (!StringUtils.hasText(uuid)) {
             return unauthorizedResponse(exchange.getResponse(), "缺少访问令牌", StatusCode.UNKNOWN_EXCEPTION);
         }
 
         String cacheKey = RedisHeaders.GATEWAY_CACHE + uuid;
-        String parsedUserInfo = redisTemplate.opsForValue().get(cacheKey);
 
-        if (StringUtils.hasText(parsedUserInfo)) {
-            try {
-                Map<String, String> userInfoMap = objectMapper.readValue(parsedUserInfo,
-                        new TypeReference<Map<String, String>>() {
-                        });
-                return addHeadersAndContinue(exchange, chain, userInfoMap);
-            } catch (JsonProcessingException e) {
-                log.error("解析缓存用户信息失败", e);
-                redisTemplate.delete(cacheKey);
-            }
-        }
-
-        // 缓存未命中，解析令牌
-        String token = redisTemplate.opsForValue().get(RedisHeaders.ACCESS_TOKEN + uuid);
-        if (StringUtils.hasText(token)) {
-            if (!JwtUtil.verifyToken(token)) {
-                redisTemplate.delete(RedisHeaders.ACCESS_TOKEN + uuid);
-                return unauthorizedResponse(exchange.getResponse(), "令牌已过期或不可用", StatusCode.TOKEN_EXPIRE_EXCEPTION);
-            }
-
-            Map<String, String> userInfoMap = JwtUtil.parseToken(token);
-            if (userInfoMap.isEmpty()) {
-                return unauthorizedResponse(exchange.getResponse(), "用户信息解析失败", StatusCode.BUSINESS_EXCEPTION);
-            }
-
-            try {
-                // 使用原子操作和随机偏移量设置缓存
-                String json = objectMapper.writeValueAsString(userInfoMap);
-                redisTemplate.opsForValue()
-                        .setIfAbsent(cacheKey, json,
-                                JwtUtil.getTokenRemainingTime(token) / 1000 + ThreadLocalRandom.current().nextInt(5, 30)
-                                , TimeUnit.SECONDS);
-//            if (Boolean.TRUE.equals(success)) {
-//                log.info("用户信息缓存成功");
-//            } else {
-//                log.info("已缓存用户信息");
-//            }
-            } catch (JsonProcessingException e) {
-                log.error("序列化用户信息失败", e);
-                return unauthorizedResponse(exchange.getResponse(), "用户信息处理失败", StatusCode.BUSINESS_EXCEPTION);
-            }
-            return addHeadersAndContinue(exchange, chain, userInfoMap);
-        } else {
-//            token过期，刷新令牌
-            return webClientService.sendGet("http://user-service/user/access_token/" + uuid, new ParameterizedTypeReference<Resp<AuthUserDTO>>() {
-                    })
-                    .flatMap(resp -> {
-                        log.warn(String.valueOf(resp));
-                        if (Objects.isNull(resp)) {
-                            return unauthorizedResponse(exchange.getResponse(), "查询用户信息失败", StatusCode.SELECT_ERR);
-                        }
-                        if (Objects.equals(resp.getCode(), StatusCode.SELECT_SUCCESS)) {
-                            AuthUserDTO authUserDTO = resp.getData();
-                            if (Objects.nonNull(authUserDTO)) {
-//                                防止重复创建token
-                                String refreshTokenLockKey = RedisHeaders.REFRESH_TOKEN_LOCK + authUserDTO.getId();
-                                Boolean lock = redisTemplate.opsForValue().setIfAbsent(refreshTokenLockKey, "1", 5, TimeUnit.SECONDS);
-                                if (Boolean.TRUE.equals(lock)) {
-                                    try {
-                                        String refreshTokenCache = redisTemplate.opsForValue().get(RedisHeaders.REFRESH_TOKEN + authUserDTO.getId());
-                                        String refreshToken = authUserDTO.getRefreshToken();
-                                        if (StringUtils.hasText(refreshTokenCache) && Objects.equals(refreshTokenCache, refreshToken)) {
-                                            String newAccessToken = UUID.randomUUID().toString();
-                                            String newToken = JwtUtil.createToken(
-                                                    authUserDTO.getId(),
-                                                    authUserDTO.getUsername(),
-                                                    JsonUtils.toJson(authUserDTO.getRoles()),
-                                                    JsonUtils.toJson(authUserDTO.getPermissions())
-                                            );
-                                            TokenDTO tokenDTO = new TokenDTO();
-                                            tokenDTO.setId(authUserDTO.getId());
-                                            tokenDTO.setAccessToken(newAccessToken);
-//                                        发送请求更新accessToken
-                                            return webClientService.sendPut("http://user-service/user/update", tokenDTO, new ParameterizedTypeReference<Resp<String>>() {
-                                                    })
-                                                    .flatMap(updateResp -> {
-                                                        if (updateResp.getCode().equals(StatusCode.UPDATE_SUCCESS)) {
-                                                            redisTemplate.opsForValue().set(RedisHeaders.ACCESS_TOKEN + newAccessToken, newToken, JwtUtil.EXPIRE_TIME, TimeUnit.MILLISECONDS);
-                                                            ServerHttpResponse response = exchange.getResponse();
-                                                            response.getHeaders().add("Access-Control-Expose-Headers", "access_token");
-                                                            response.getHeaders().add("access_token", newAccessToken);
-                                                            Map<String, String> userInfoMap = JwtUtil.parseToken(newToken);
-                                                            redisTemplate.delete(RedisHeaders.ACCESS_TOKEN + updateResp.getData());
-                                                            return addHeadersAndContinue(exchange, chain, userInfoMap);
-                                                        } else {
-                                                            return unauthorizedResponse(exchange.getResponse(), "令牌生成失败", StatusCode.UPDATE_ERR);
-                                                        }
-                                                    }).onErrorResume(e -> {
-                                                        log.error("更新用户信息失败", e);
-                                                        return unauthorizedResponse(exchange.getResponse(), "更新用户信息失败", StatusCode.UPDATE_ERR);
-                                                    }).timeout(Duration.ofSeconds(5))
-                                                    .retryWhen(Retry.backoff(2, Duration.ofMillis(100)));
-                                        }
-                                    } finally {
-                                        redisTemplate.delete(refreshTokenLockKey);
-                                    }
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(parsedUserInfo -> {
+                    try {
+                        Map<String, String> userInfoMap = objectMapper.readValue(
+                                parsedUserInfo, new TypeReference<Map<String, String>>() {
                                 }
-                            }
-                        }
-                        return unauthorizedResponse(exchange.getResponse(), "等待令牌刷新", StatusCode.TOKEN_EXPIRE_EXCEPTION);
-                    }).onErrorResume(e -> {
-                        log.error("尝试通过accessToken获取用户信息失败 => " + e);
-                        return unauthorizedResponse(exchange.getResponse(), "查询用户信息失败", StatusCode.SELECT_ERR);
-                    }).timeout(Duration.ofSeconds(5))
-                    .retryWhen(Retry.backoff(2, Duration.ofMillis(100)));
-//            redisTemplate.opsForValue().get("refresh_token:" + resp)
-//            return unauthorizedResponse(exchange.getResponse(), "令牌不存在", 404);
-        }
+                        );
+                        return addHeadersAndContinue(exchange, chain, userInfoMap);
+                    } catch (JsonProcessingException e) {
+                        log.error("解析缓存用户信息失败", e);
+                        return redisTemplate.delete(cacheKey)
+                                .then(unauthorizedResponse(exchange.getResponse(), "用户信息解析失败", StatusCode.BUSINESS_EXCEPTION));
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() -> checkTokenAndRefresh(uuid, exchange, chain, cacheKey)))
+                .onErrorResume(e -> {
+                    log.error("认证流程异常", e);
+                    return unauthorizedResponse(exchange.getResponse(), "系统异常", StatusCode.UNKNOWN_EXCEPTION);
+                });
     }
 
+    private Mono<Void> checkTokenAndRefresh(String uuid, ServerWebExchange exchange, GatewayFilterChain chain, String cacheKey) {
+        String accessTokenKey = RedisHeaders.ACCESS_TOKEN + uuid;
+
+        return redisTemplate.opsForValue().get(accessTokenKey)
+                .flatMap(token -> {
+                    if (!JwtUtil.verifyToken(token)) {
+                        return redisTemplate.delete(accessTokenKey)
+                                .then(unauthorizedResponse(exchange.getResponse(), "令牌已过期或不可用", StatusCode.TOKEN_EXPIRE_EXCEPTION));
+                    }
+
+                    Map<String, String> userInfoMap = JwtUtil.parseToken(token);
+                    if (userInfoMap.isEmpty()) {
+                        return unauthorizedResponse(exchange.getResponse(), "用户信息解析失败", StatusCode.BUSINESS_EXCEPTION);
+                    }
+
+                    try {
+                        String json = objectMapper.writeValueAsString(userInfoMap);
+                        long expireTime = JwtUtil.getTokenRemainingTime(token) / 1000 + ThreadLocalRandom.current().nextInt(5, 30);
+
+                        return redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(expireTime))
+                                .then(addHeadersAndContinue(exchange, chain, userInfoMap));
+                    } catch (JsonProcessingException e) {
+                        log.error("序列化用户信息失败", e);
+                        return unauthorizedResponse(exchange.getResponse(), "用户信息处理失败", StatusCode.BUSINESS_EXCEPTION);
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() -> refreshTokenFlow(uuid, exchange, chain)));
+    }
+
+    private Mono<Void> refreshTokenFlow(String uuid, ServerWebExchange exchange, GatewayFilterChain chain) {
+        return webClientService.sendGet(
+                        "http://user-service/user/access_token/" + uuid,
+                        new ParameterizedTypeReference<Resp<AuthUserDTO>>() {
+                        })
+                .timeout(Duration.ofSeconds(5))
+                .retryWhen(Retry.backoff(2, Duration.ofMillis(100)))
+                .flatMap(resp -> {
+                    if (!Objects.equals(resp.getCode(), StatusCode.SELECT_SUCCESS) || resp.getData() == null) {
+                        return unauthorizedResponse(exchange.getResponse(), "查询用户信息失败", StatusCode.SELECT_ERR);
+                    }
+
+                    AuthUserDTO authUserDTO = resp.getData();
+                    String refreshTokenLockKey = RedisHeaders.REFRESH_TOKEN_LOCK + authUserDTO.getId();
+
+                    return redisTemplate.opsForValue().set(
+                                    refreshTokenLockKey, "1", Duration.ofSeconds(5))
+                            .filter(Boolean.TRUE::equals)
+                            .flatMap(lock -> processTokenRefresh(authUserDTO, exchange, chain, refreshTokenLockKey))
+                            .switchIfEmpty(unauthorizedResponse(exchange.getResponse(), "令牌刷新中请重试", StatusCode.TOKEN_EXPIRE_EXCEPTION));
+                });
+    }
+
+    private Mono<Void> processTokenRefresh(AuthUserDTO authUserDTO, ServerWebExchange exchange,
+                                           GatewayFilterChain chain, String lockKey) {
+        return Mono.usingWhen(
+                Mono.just(lockKey),
+                key -> checkRefreshToken(authUserDTO, exchange, chain),
+                key -> redisTemplate.delete(key).then()
+        );
+    }
+
+    private Mono<Void> checkRefreshToken(AuthUserDTO authUserDTO, ServerWebExchange exchange,
+                                         GatewayFilterChain chain) {
+        String refreshTokenKey = RedisHeaders.REFRESH_TOKEN + authUserDTO.getId();
+
+        return redisTemplate.opsForValue().get(refreshTokenKey)
+                .filter(refreshTokenCache -> refreshTokenCache.equals(authUserDTO.getRefreshToken()))
+                .flatMap(refreshToken -> generateNewToken(authUserDTO, exchange, chain))
+                .switchIfEmpty(unauthorizedResponse(exchange.getResponse(), "刷新令牌无效", StatusCode.TOKEN_EXPIRE_EXCEPTION));
+    }
+
+    private Mono<Void> generateNewToken(AuthUserDTO authUserDTO, ServerWebExchange exchange,
+                                        GatewayFilterChain chain) {
+        String newAccessToken = UUID.randomUUID().toString();
+        String newToken = JwtUtil.createToken(
+                authUserDTO.getId(),
+                authUserDTO.getUsername(),
+                JsonUtils.toJson(authUserDTO.getRoles()),
+                JsonUtils.toJson(authUserDTO.getPermissions())
+        );
+
+        TokenDTO tokenDTO = new TokenDTO();
+        tokenDTO.setId(authUserDTO.getId());
+        tokenDTO.setAccessToken(newAccessToken);
+
+        return webClientService.sendPut("http://user-service/user/update", tokenDTO,
+                        new ParameterizedTypeReference<Resp<String>>() {
+                        })
+                .flatMap(updateResp -> {
+                    System.out.println(updateResp);
+                    if (!Objects.equals(updateResp.getCode(), StatusCode.UPDATE_SUCCESS)) {
+                        return unauthorizedResponse(exchange.getResponse(), updateResp.getMsg(), updateResp.getCode());
+                    }
+
+                    ServerHttpResponse response = exchange.getResponse();
+                    response.getHeaders().add("Access-Control-Expose-Headers", "access_token");
+                    response.getHeaders().add("access_token", newAccessToken);
+
+                    return redisTemplate.opsForValue().set(
+                                    RedisHeaders.ACCESS_TOKEN + newAccessToken,
+                                    newToken,
+                                    Duration.ofMillis(JwtUtil.EXPIRE_TIME))
+                            .then(redisTemplate.delete(RedisHeaders.ACCESS_TOKEN + updateResp.getData()))
+                            .then(addHeadersAndContinue(exchange, chain, JwtUtil.parseToken(newToken)));
+                });
+    }
+
+    // 其他方法保持不变...
     private Mono<Void> addHeadersAndContinue(ServerWebExchange exchange,
                                              GatewayFilterChain chain,
                                              Map<String, String> userInfoMap) {

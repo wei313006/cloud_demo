@@ -1,7 +1,7 @@
 package common.security.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import common.security.entity.Resp;
+import common.core.entity.Resp;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

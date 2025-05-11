@@ -1,19 +1,21 @@
-package auth.center.clients;
+package common.feign.clients;
 
 import common.core.entity.Resp;
-import common.security.entity.TokenDTO;
+import common.core.entity.dto.AuthUserDTO;
+import common.core.entity.dto.TokenDTO;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import common.security.entity.AuthUserDTO;
 
 /**
  * @author abing
- * @created 2025/4/15 18:04
+ * @created 2025/4/16 13:50
  */
 
+@Configuration
 @FeignClient(name = "user-service")
 public interface UserClient {
 
@@ -23,4 +25,7 @@ public interface UserClient {
     @PutMapping("/user/update")
     Resp<String> update(@RequestBody TokenDTO tokenDTO);
 
+    @GetMapping("/user/generate/role_perm/{id}")
+    Resp<AuthUserDTO> generate(@PathVariable String id);
 }
+

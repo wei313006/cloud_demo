@@ -2,6 +2,7 @@
 /common-core/target/
 /common-security/target/
 /common-datasource/target/
+/common-feign/target/
 /search-service/target/
 /norify-service/target/
 /gateway/target/

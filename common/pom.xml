@@ -18,6 +18,7 @@
         <module>common-core</module>
         <module>common-security</module>
         <module>common-datasource</module>
+        <module>common-feign</module>
     </modules>
 
     <properties>

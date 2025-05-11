@@ -3,9 +3,9 @@ package user.controller;
 import common.core.annotation.SysLog;
 import common.core.entity.Resp;
 import common.core.entity.StatusCode;
+import common.core.entity.dto.AuthUserDTO;
 import common.core.exception.AuthException;
-import common.security.entity.AuthUserDTO;
-import common.security.entity.TokenDTO;
+import common.core.entity.dto.TokenDTO;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
@@ -97,12 +97,13 @@ public class UserController {
         return Resp.success("ok", StatusCode.SELECT_SUCCESS, authVo);
     }
 
+
     @SysLog(explain = "通过token获取用户信息")
     @GetMapping("/access_token/{accessToken}")
     public Resp<AuthUserDTO> findByAccessToken(@PathVariable String accessToken) {
         User user = userService.findByAccessToken(accessToken);
         if (Objects.isNull(user)) {
-            throw new AuthException("用户不存在!");
+            return Resp.error("查询不到用户", StatusCode.SELECT_ERR);
         }
         return generateAuthUserDto(user);
     }
@@ -140,6 +141,22 @@ public class UserController {
         System.out.println(SecurityContextHolder.getContext().getAuthentication() + " 2 ");
 //        UserDetails userDetail = SecurityUtils.getUserDetail();
         return Resp.success("ok", StatusCode.SELECT_SUCCESS, userService.findAll());
+    }
+
+    @GetMapping("/generate/role_perm/{id}")
+    public Resp<AuthUserDTO> generateRolePermDto(@PathVariable String id) {
+        if (StringUtils.isNotBlank(id)) {
+            try {
+                User user = userService.findById(Long.parseLong(id));
+                if (Objects.isNull(user)) {
+                    return Resp.error("failed", StatusCode.SELECT_ERR);
+                }
+                return generateAuthUserDto(user);
+            } catch (NumberFormatException e) {
+                throw new NumberFormatException("非法id参数" + e.getMessage());
+            }
+        }
+        throw new NumberFormatException("非法id参数");
     }
 
     @GetMapping("/find_by_id/{id}")

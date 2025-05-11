@@ -7,7 +7,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @SpringBootApplication(
         scanBasePackages = {"user", "common.core", "common.security"}
 )
-@EnableFeignClients
+@EnableFeignClients(basePackages = {"common.feign","common.security"})
 public class UserApplication {
 
     public static void main(String[] args) {
