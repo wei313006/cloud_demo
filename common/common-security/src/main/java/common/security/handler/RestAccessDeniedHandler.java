@@ -2,6 +2,7 @@ package common.security.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import common.core.entity.Resp;
+import common.core.entity.StatusCode;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,7 +27,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
         response.setHeader("Access-Control-Allow-Headers", "x-requested-with, Content-Type");
         response.setContentType("application/json;charset=UTF-8");
         response.setHeader("WWW-Authenticate", "");
-        String asString = objectMapper.writeValueAsString(Resp.error("没有权限", 403));
+        String asString = objectMapper.writeValueAsString(Resp.error("没有权限", StatusCode.INTERCEPTOR_ERROR));
         response.getWriter().write(asString);
     }
 }

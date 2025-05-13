@@ -76,14 +76,15 @@ public class AuthController {
             authVo = JsonUtils.toBean(authenticatedCache, AuthUserDTO.class);
         }
 
-        List<String> roleList = authVo.getRoles();
-        if (Objects.isNull(roleList) || roleList.isEmpty()) {
-            return Resp.error("用户角色为空", StatusCode.AUTHORIZED_EXCEPTION);
-        }
-        List<String> permissionList = authVo.getPermissions();
-        String roles = JsonUtils.toJson(roleList);
-        String permissions = JsonUtils.toJson(permissionList);
-        token = JwtUtil.createToken(authVo.getId(), authVo.getUsername(), roles, permissions);
+//        List<String> roleList = authVo.getRoles();
+//        if (Objects.isNull(roleList) || roleList.isEmpty()) {
+//            return Resp.error("用户角色为空", StatusCode.AUTHORIZED_EXCEPTION);
+//        }
+//        List<String> permissionList = authVo.getPermissions();
+//        String roles = JsonUtils.toJson(roleList);
+//        String permissions = JsonUtils.toJson(permissionList);
+//        token = JwtUtil.createToken(authVo.getId(), authVo.getUsername(), roles, permissions);
+        token = JwtUtil.createToken(authVo.getId(), authVo.getUsername());
 
 //        随机uuid，增加签名或校验机制防止伪造，也可加密uuid（可逆加密）
         String accessToken = UUID.randomUUID().toString();

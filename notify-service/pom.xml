@@ -11,6 +11,7 @@
     <groupId>notify</groupId>
     <artifactId>notify-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <description>通知、短信服务</description>
     <properties>
         <java.version>17</java.version>
     </properties>

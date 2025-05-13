@@ -2,6 +2,7 @@ package common.security.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import common.core.entity.Resp;
+import common.core.entity.StatusCode;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,7 +25,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setHeader("Access-Control-Allow-Headers", "x-requested-with, Content-Type");
         response.setContentType("application/json;charset=UTF-8");
         response.setHeader("WWW-Authenticate", "");
-        String asString = objectMapper.writeValueAsString(Resp.error("认证失败，账号或者密码错误", 403));
+        String asString = objectMapper.writeValueAsString(Resp.error("认证失败，账号或者密码错误", StatusCode.AUTHORIZED_EXCEPTION));
         response.getWriter().write(asString);
     }
 }

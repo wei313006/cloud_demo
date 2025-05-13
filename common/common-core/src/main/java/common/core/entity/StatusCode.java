@@ -18,7 +18,7 @@ public class StatusCode {
     public static final Integer SQL_FOREIGN_EXCEPTION = 20040; // sql约束异常
     public static final Integer NULL_POINTER_EXCEPTION = 20050; // 空指针异常
     public static final Integer CONNECT_EXCEPTION = 20060; // 连接异常
-    public static final Integer TOKEN_EXPIRE_EXCEPTION = 20070; // token过期
+    public static final Integer TOKEN_EXCEPTION = 20070; // token过期
     public static final Integer INTERCEPTOR_ERROR = 20080; // 无权限
     public static final Integer AUTHORIZED_EXCEPTION = 20090; // 未认证
     public static final Integer CHECKCODE_EXCEPTION = 20100; // 验证码错误

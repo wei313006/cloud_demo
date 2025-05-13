@@ -61,38 +61,41 @@ public class UserController {
         boolean matches = passwordEncoder.matches(authUserDTO.getPassword(), user.getPassword());
         if (matches) {
 //        获取用户角色表
-            return generateAuthUserDto(user);
+            return generateAuthUserDto(user, 0);
         }
         throw new AuthException("用户名或密码错误!");
     }
 
-    public Resp<AuthUserDTO> generateAuthUserDto(User user) {
-        List<UserRoles> userRolesList = userRolesService.findByUid(user.getId());
-        if (userRolesList.isEmpty()) {
-            throw new AuthException("用户角色为空");
-        }
-        List<Integer> userRolesIds = userRolesList.stream()
-                .map(UserRoles::getRid)
-                .collect(Collectors.toList());
-//        获取角色权限表
-        List<RolePermissions> rolePermissionsList = rolePermissionsService.findByRoleId(userRolesIds);
-        List<Integer> permissionIds = rolePermissionsList.stream()
-                .map(RolePermissions::getPermissionId)
-                .collect(Collectors.toList());
+    public Resp<AuthUserDTO> generateAuthUserDto(User user, int type) {
 
-//        获取用户登录信息
+//        生成用户登录信息
         AuthUserDTO authVo = new AuthUserDTO();
         authVo.setId(user.getId().toString());
         authVo.setUsername(user.getUsername());
         authVo.setAccessToken(user.getAccessToken());
         authVo.setRefreshToken(user.getRefreshToken());
-        List<String> userRoles = rolesService.findByIds(userRolesIds);
-        authVo.setRoles(userRoles);
-        if (!permissionIds.isEmpty()) {
-            List<String> permissions = permissionsService.findByIds(permissionIds);
-            authVo.setPermissions(permissions);
-        } else {
-            authVo.setPermissions(new ArrayList<>());
+
+        if (type == 1) {
+            List<UserRoles> userRolesList = userRolesService.findByUid(user.getId());
+            if (userRolesList.isEmpty()) {
+                throw new AuthException("用户角色为空");
+            }
+            List<Integer> userRolesIds = userRolesList.stream()
+                    .map(UserRoles::getRid)
+                    .collect(Collectors.toList());
+//        获取角色权限表
+            List<RolePermissions> rolePermissionsList = rolePermissionsService.findByRoleId(userRolesIds);
+            List<Integer> permissionIds = rolePermissionsList.stream()
+                    .map(RolePermissions::getPermissionId)
+                    .collect(Collectors.toList());
+            List<String> userRoles = rolesService.findByIds(userRolesIds);
+            authVo.setRoles(userRoles);
+            if (!permissionIds.isEmpty()) {
+                List<String> permissions = permissionsService.findByIds(permissionIds);
+                authVo.setPermissions(permissions);
+            } else {
+                authVo.setPermissions(new ArrayList<>());
+            }
         }
         return Resp.success("ok", StatusCode.SELECT_SUCCESS, authVo);
     }
@@ -105,7 +108,7 @@ public class UserController {
         if (Objects.isNull(user)) {
             return Resp.error("查询不到用户", StatusCode.SELECT_ERR);
         }
-        return generateAuthUserDto(user);
+        return generateAuthUserDto(user, 0);
     }
 
     @SysLog(explain = "修改用户信息")
@@ -151,13 +154,14 @@ public class UserController {
                 if (Objects.isNull(user)) {
                     return Resp.error("failed", StatusCode.SELECT_ERR);
                 }
-                return generateAuthUserDto(user);
+                return generateAuthUserDto(user, 1);
             } catch (NumberFormatException e) {
                 throw new NumberFormatException("非法id参数" + e.getMessage());
             }
         }
         throw new NumberFormatException("非法id参数");
     }
+
 
     @GetMapping("/find_by_id/{id}")
     public Resp<User> findById(@PathVariable() String id) {

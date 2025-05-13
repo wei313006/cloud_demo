@@ -3,9 +3,6 @@ package common.security.filter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import common.core.entity.Resp;
-import common.core.entity.dto.AuthUserDTO;
-import common.feign.clients.UserClient;
 import common.security.entity.SecurityHeaders;
 import jakarta.annotation.Resource;
 import jakarta.servlet.*;
@@ -39,9 +36,6 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
     @Resource
     private ObjectMapper objectMapper;
 
-//    @Resource
-//    private UserClient userClient;
-
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -64,7 +58,6 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
             String userId = request.getHeader(SecurityHeaders.USERID);
             String roles = request.getHeader(SecurityHeaders.ROLES);
             String perms = request.getHeader(SecurityHeaders.PERMISSIONS);
-//            Resp<AuthUserDTO> resp = userClient.generate(userId);
 
             log.warn(username + " => " + userId + " => " + roles + " => " + perms + " findByUid => " );
             if (isValidHeaders(username, userId, roles)) {

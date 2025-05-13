@@ -12,14 +12,14 @@ public class JwtUtil {
     public static final long EXPIRE_TIME = 1000L * 60 * 30;  //  半小时
     public static final long REFRESH_TOKEN_EXPIRE_TIME = 1000L * 60 * 60 * 24 * 8;  //    八天
 
-    public static String createToken(String userid, String username, String roles, String permissions) {
+    public static String createToken(String userid, String username) {
         JwtBuilder jwtBuilder = Jwts.builder();
         return jwtBuilder.setHeaderParam("typ", "JWT")
                 .setHeaderParam("alg", "HS256")
                 .claim("userid", userid)
                 .claim("username", username)
-                .claim("roles", roles)
-                .claim("permissions", permissions)
+//                .claim("roles", roles)
+//                .claim("permissions", permissions)
                 .setId(UUID.randomUUID().toString())
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRE_TIME))
                 .setSubject("CREATE_TOKEN")
@@ -54,12 +54,12 @@ public class JwtUtil {
         Claims body = claimsJws.getBody();
         String username = (String) body.get("username");
         String userid = (String) body.get("userid");
-        String password = (String) body.get("roles");
-        String permissions = (String) body.get("permissions");
+//        String password = (String) body.get("roles");
+//        String permissions = (String) body.get("permissions");
         map.put("userid", userid);
         map.put("username", username);
-        map.put("roles", password);
-        map.put("permissions", permissions);
+//        map.put("roles", password);
+//        map.put("permissions", permissions);
         return map;
     }
 
