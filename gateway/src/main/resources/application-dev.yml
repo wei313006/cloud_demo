@@ -9,6 +9,8 @@ spring:
       discovery:
         server-addr: localhost:8848
         enabled: true
+        metadata:
+          gateway: true
     gateway:
       routes:
         - id: auth-service

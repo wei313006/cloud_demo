@@ -7,7 +7,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 /**
- * 加密工具
+ * @author abing
+ * @created 2025/4/20 15:50
+ * 线上环境推荐使用配置文件获取环境变量控制密钥
  */
 public class AesEncipherUtils {
 

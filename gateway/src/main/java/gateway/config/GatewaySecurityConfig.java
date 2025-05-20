@@ -32,6 +32,7 @@ public class GatewaySecurityConfig {
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
+//                        .pathMatchers("/user/admin/**").authenticated()
                         .anyExchange().permitAll()
                 )
                 .build();
@@ -46,8 +47,8 @@ public class GatewaySecurityConfig {
                     ServerWebExchange exchange = context.getExchange();
                     HttpHeaders headers = exchange.getRequest().getHeaders();
 
-                    // 从请求头中直接获取认证标记
-                    boolean isAuthenticated = headers.containsKey(SecurityHeaders.AUTHENTICATED);
+                    // 从请求头中直接获取签名
+                    boolean isAuthenticated = headers.containsKey(SecurityHeaders.SIGNATURE);
                     return Mono.just(new AuthorizationDecision(isAuthenticated));
                 })
                 .defaultIfEmpty(new AuthorizationDecision(false));

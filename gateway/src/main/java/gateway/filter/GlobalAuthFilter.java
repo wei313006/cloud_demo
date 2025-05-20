@@ -5,6 +5,8 @@ import common.core.entity.RedisHeaders;
 import common.core.entity.Resp;
 import common.core.entity.StatusCode;
 import common.core.entity.dto.AuthUserDTO;
+import common.core.utils.AesEncipherUtils;
+import common.core.utils.HmacUtils;
 import common.core.utils.JsonUtils;
 import common.core.entity.dto.TokenDTO;
 import gateway.clients.WebClientService;
@@ -67,32 +69,39 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        String accessToken = extractToken(request);
-        if (!StringUtils.hasText(accessToken)) {
-            return unauthorizedResponse(exchange.getResponse(), "缺少访问令牌", StatusCode.UNKNOWN_EXCEPTION);
-        }
+        log.info(request.getURI().getPath() + " => " + request.getURI().getPath().startsWith("/user/admin/"));
 
-        String cacheKey = RedisHeaders.GATEWAY_CACHE + accessToken;
+//        只拦截这一请求路径开头并进入认证逻辑，@PreAuthorize注解不在认证路径下时会报错
+        if (request.getURI().getPath().startsWith("/user/admin/")) {
 
-        String parsedUserInfo = redisTemplate.opsForValue().get(cacheKey);
-
-        if (StringUtils.hasText(parsedUserInfo)) {
-            try {
-                Map<String, String> userInfoMap = JsonUtils.toBean(parsedUserInfo, Map.class);
-                return addHeadersAndContinue(exchange, chain, Optional.ofNullable(userInfoMap.get("userid")).orElse(""));
-            } catch (Exception e) {
-                log.error("解析缓存用户信息失败", e);
-                redisTemplate.delete(cacheKey);
-                return unauthorizedResponse(exchange.getResponse(), "用户信息解析失败", StatusCode.BUSINESS_EXCEPTION);
+            String accessToken = extractToken(request);
+            if (!StringUtils.hasText(accessToken)) {
+                return unauthorizedResponse(exchange.getResponse(), "缺少访问令牌", StatusCode.UNKNOWN_EXCEPTION);
             }
-        } else {
-            return checkTokenAndRefresh(accessToken, exchange, chain, cacheKey);
+
+            String cacheKey = RedisHeaders.GATEWAY_CACHE + accessToken;
+
+            String parsedUserInfo = redisTemplate.opsForValue().get(cacheKey);
+
+            if (StringUtils.hasText(parsedUserInfo)) {
+                try {
+                    Map<String, String> userInfoMap = JsonUtils.toBean(parsedUserInfo, Map.class);
+                    return generateHeadersAndContinue(exchange, chain, Optional.ofNullable(userInfoMap.get("userid")).orElse(""));
+                } catch (Exception e) {
+                    log.error("解析缓存用户信息失败", e);
+                    redisTemplate.delete(cacheKey);
+                    return unauthorizedResponse(exchange.getResponse(), "用户信息解析失败", StatusCode.BUSINESS_EXCEPTION);
+                }
+            } else {
+                return checkTokenAndRefresh(accessToken, exchange, chain, cacheKey);
+            }
         }
+        return chain.filter(exchange);
     }
 
     private Mono<Void> checkTokenAndRefresh(String accessToken, ServerWebExchange exchange, GatewayFilterChain chain, String cacheKey) {
-        String accessTokenKey = RedisHeaders.ACCESS_TOKEN + accessToken;
 
+        String accessTokenKey = RedisHeaders.ACCESS_TOKEN + accessToken;
         String token = redisTemplate.opsForValue().get(accessTokenKey);
 
         if (!StringUtils.hasText(token)) {
@@ -114,7 +123,7 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
 
             redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(expireTime));
 
-            return addHeadersAndContinue(exchange, chain, Optional.ofNullable(userInfoMap.get("userid")).orElse(""));
+            return generateHeadersAndContinue(exchange, chain, Optional.ofNullable(userInfoMap.get("userid")).orElse(""));
         }
     }
 
@@ -124,6 +133,7 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                         new ParameterizedTypeReference<Resp<AuthUserDTO>>() {
                         })
                 .flatMap(resp -> {
+
                     if (!Objects.equals(resp.getCode(), StatusCode.SELECT_SUCCESS) || resp.getData() == null) {
                         return unauthorizedResponse(exchange.getResponse(), "查询用户信息失败", StatusCode.SELECT_ERR);
                     }
@@ -204,18 +214,26 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                     redisTemplate.delete(RedisHeaders.ACCESS_TOKEN + updateResp.getData());
                     redisTemplate.delete(RedisHeaders.GATEWAY_CACHE + updateResp.getData());
 
-                    return addHeadersAndContinue(exchange, chain, authUserDTO.getId());
+                    return generateHeadersAndContinue(exchange, chain, authUserDTO.getId());
                 }).timeout(Duration.ofSeconds(5))
                 .retryWhen(Retry.backoff(2, Duration.ofMillis(100)));
     }
 
 
-    private Mono<Void> addHeadersAndContinue(ServerWebExchange exchange,
-                                             GatewayFilterChain chain,
-                                             String id) {
+    private Mono<Void> generateHeadersAndContinue(ServerWebExchange exchange,
+                                                  GatewayFilterChain chain,
+                                                  String id) {
         if (!StringUtils.hasText(id)) {
             return unauthorizedResponse(exchange.getResponse(), "令牌不合法", StatusCode.TOKEN_EXCEPTION);
         }
+
+        String userRolePerm = redisTemplate.opsForValue().get(RedisHeaders.USER_ROLE_PERM_CACHE + id);
+        if (StringUtils.hasText(userRolePerm)) {
+            AuthUserDTO authUserDTO = JsonUtils.toBean(userRolePerm, AuthUserDTO.class);
+            ServerHttpRequest serverHttpRequest = addHeaders(exchange.getRequest(), authUserDTO);
+            return chain.filter(exchange.mutate().request(serverHttpRequest).build());
+        }
+
         return webClientService.sendGet("http://user-service/user/generate/role_perm/" + id,
                         new ParameterizedTypeReference<Resp<AuthUserDTO>>() {
                         })
@@ -224,17 +242,32 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                         return unauthorizedResponse(exchange.getResponse(), resp.getMsg(), resp.getCode());
                     }
                     AuthUserDTO authUserDTO = resp.getData();
-                    ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                            .header(SecurityHeaders.USERID, authUserDTO.getId())
-                            .header(SecurityHeaders.USERNAME, authUserDTO.getUsername())
-                            .header(SecurityHeaders.ROLES, JsonUtils.toJson(authUserDTO.getRoles()))
-                            .header(SecurityHeaders.PERMISSIONS, JsonUtils.toJson(authUserDTO.getPermissions()))
-                            .header(SecurityHeaders.AUTHENTICATED, "true")
-                            .build();
+                    ServerHttpRequest serverHttpRequest = addHeaders(exchange.getRequest(), authUserDTO);
 
-                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
+//                    缓存角色权限信息
+                    redisTemplate.opsForValue().set(RedisHeaders.USER_ROLE_PERM_CACHE + authUserDTO.getId(), JsonUtils.toJson(authUserDTO), Duration.ofMinutes(5));
+                    return chain.filter(exchange.mutate().request(serverHttpRequest).build());
                 }).timeout(Duration.ofSeconds(5))
                 .retryWhen(Retry.backoff(2, Duration.ofMillis(100)));
+    }
+
+    public ServerHttpRequest addHeaders(ServerHttpRequest serverHttpRequest, AuthUserDTO authUserDTO) {
+        String signatureStr = "userid=" + authUserDTO.getId() + "&username=" + authUserDTO.getUsername() + "&timestamp=" + System.currentTimeMillis();
+        String signature;
+        try {
+            signature = HmacUtils.generateHmacSHA256(signatureStr);
+        } catch (Exception e) {
+            throw new RuntimeException("签名失败 ");
+        }
+        return serverHttpRequest.mutate()
+                .header(SecurityHeaders.USERID, authUserDTO.getId())
+                .header(SecurityHeaders.USERNAME, authUserDTO.getUsername())
+                .header(SecurityHeaders.ROLES, JsonUtils.toJson(authUserDTO.getRoles()))
+                .header(SecurityHeaders.PERMISSIONS, JsonUtils.toJson(authUserDTO.getPermissions()))
+                .header(SecurityHeaders.TIMESTAMP, String.valueOf(System.currentTimeMillis()))
+//                添加用户信息签名
+                .header(SecurityHeaders.SIGNATURE, signature)
+                .build();
     }
 
     private String extractToken(
@@ -243,10 +276,12 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> unauthorizedResponse(ServerHttpResponse response, String msg, int code) {
+//        防止重复提交
         if (response.isCommitted()) {
             return response.setComplete();
         }
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
+        response.getHeaders().add("WWW-Authenticate", "");
         HashMap<String, Object> resp = new HashMap<>();
         resp.put("msg", msg);
         resp.put("code", code);

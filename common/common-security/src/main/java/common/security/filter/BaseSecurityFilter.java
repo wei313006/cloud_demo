@@ -3,6 +3,10 @@ package common.security.filter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import common.core.entity.Resp;
+import common.core.entity.StatusCode;
+import common.core.utils.HmacUtils;
+import common.core.utils.JsonUtils;
 import common.security.entity.SecurityHeaders;
 import jakarta.annotation.Resource;
 import jakarta.servlet.*;
@@ -23,6 +27,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @author abing
@@ -41,45 +46,78 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
 
-//        String sourceFromGateway = request.getHeader(SecurityHeaders.AUTHENTICATED);
-//        if (!sourceFromGateway.equals("true")){
-//            return;
-//        }
-
-
-        log.info(request.getRequestURI() + " => " + request.getMethod());
+//        放行预检请求
         if (HttpMethod.OPTIONS.matches(request.getMethod())) {
             response.setStatus(HttpServletResponse.SC_OK);
             chain.doFilter(request, response);
             return;
         }
-        try {
-            String username = request.getHeader(SecurityHeaders.USERNAME);
-            String userId = request.getHeader(SecurityHeaders.USERID);
-            String roles = request.getHeader(SecurityHeaders.ROLES);
-            String perms = request.getHeader(SecurityHeaders.PERMISSIONS);
 
-            log.warn(username + " => " + userId + " => " + roles + " => " + perms + " findByUid => " );
-            if (isValidHeaders(username, userId, roles)) {
-//                verifyRequestSource(request); // 校验请求来源
-                Authentication auth = buildAuthentication(username, userId, roles, perms);
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            } else {
-                SecurityContextHolder.clearContext();
-//                throw new InsufficientAuthenticationException("认证头信息缺失");
+        log.info(request.getRequestURI());
+
+        String timestamp = request.getHeader(SecurityHeaders.TIMESTAMP);
+        String username = request.getHeader(SecurityHeaders.USERNAME);
+        String userId = request.getHeader(SecurityHeaders.USERID);
+        String roles = request.getHeader(SecurityHeaders.ROLES);
+        String perms = request.getHeader(SecurityHeaders.PERMISSIONS);
+        String signature = request.getHeader(SecurityHeaders.SIGNATURE);
+
+//        if (!hasAuthHeaders(username, userId, roles, signature, timestamp)) {
+//            respMsg(response, "请求信息缺失", StatusCode.INTERCEPTOR_ERROR);
+//            SecurityContextHolder.clearContext();
+//            return;
+//        }
+
+        if (!hasAuthHeaders(username, userId, roles, signature, timestamp)) {
+            respMsg(response, "请求信息缺失", StatusCode.INTERCEPTOR_ERROR);
+            SecurityContextHolder.clearContext();
+            return;
+        }
+
+//        一分钟后请求超时
+        try {
+            long reqTime = Long.parseLong(timestamp);
+            if (System.currentTimeMillis() - reqTime > 60 * 1000) {
+                respMsg(response, "访问超时", StatusCode.INTERCEPTOR_ERROR);
+                return;
             }
+        } catch (NumberFormatException e) {
+            respMsg(response, "非法时间格式", StatusCode.INTERCEPTOR_ERROR);
+            return;
+        }
+
+
+//        构建签名并验证
+        String signatureStr = "userid=" + userId + "&username=" + username + "&timestamp=" + timestamp;
+        try {
+            boolean isValid = HmacUtils.verifyHmac(signature, signatureStr);
+            if (!isValid) {
+                respMsg(response, "签名不正确", StatusCode.INTERCEPTOR_ERROR);
+                return;
+            }
+        } catch (Exception e) {
+            respMsg(response, "签名校验异常", StatusCode.INTERCEPTOR_ERROR);
+            return;
+        }
+
+        try {
+            log.info(username + " => " + userId + " => " + roles + " => " + perms);
+            Authentication auth = buildAuthentication(username, roles, perms);
+            SecurityContextHolder.getContext().setAuthentication(auth);
             chain.doFilter(request, response);
         } finally {
             SecurityContextHolder.clearContext();
         }
+
     }
 
-    private Authentication buildAuthentication(String username, String userId,
+    private Authentication buildAuthentication(String username,
                                                String roles, String perms) {
         List<GrantedAuthority> authorities = new ArrayList<>();
         try {
             List<String> roleList = objectMapper.readValue(roles, new TypeReference<>() {
             });
+
             roleList.forEach(role ->
                     authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
 
@@ -97,14 +135,18 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
     }
 
     // 自定义校验逻辑
-    private boolean isValidHeaders(String username, String userId, String roles) {
+    private boolean hasAuthHeaders(String username, String userId, String roles, String signature, String timestamp) {
         return StringUtils.hasText(username)
                 && StringUtils.hasText(userId)
-                && StringUtils.hasText(roles);
+                && StringUtils.hasText(roles)
+                && StringUtils.hasText(signature)
+                && StringUtils.hasText(timestamp);
     }
 
-    private void verifyRequestSource(HttpServletRequest request) {
-        // 实现签名/IP校验逻辑
+    public void respMsg(HttpServletResponse response, String msg, int code) throws IOException {
+        response.setContentType("application/json;charset=UTF-8");
+        String asString = objectMapper.writeValueAsString(Resp.error(msg, code));
+        response.getWriter().write(asString);
     }
 }
 

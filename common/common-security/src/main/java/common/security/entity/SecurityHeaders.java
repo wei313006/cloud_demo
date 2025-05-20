@@ -9,7 +9,6 @@ public class SecurityHeaders {
     public static final String PERMISSIONS = "x-authenticated-permissions";
     public static final String USERID = "x-authenticated-user-id";
     public static final String ROLES = "x-authenticated-user-role";
-    public static final String AUTHENTICATED = "x-authenticated";
-
-
+    public static final String SIGNATURE = "x-authenticated-signature";
+    public static final String TIMESTAMP = "x-authenticated-signature";
 }
