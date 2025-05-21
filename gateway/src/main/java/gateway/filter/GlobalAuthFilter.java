@@ -69,7 +69,7 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        log.info(request.getURI().getPath() + " => " + request.getURI().getPath().startsWith("/user/admin/"));
+//        log.info(request.getURI().getPath() + " => " + request.getURI().getPath().startsWith("/user/admin/"));
 
 //        只拦截这一请求路径开头并进入认证逻辑，@PreAuthorize注解不在认证路径下时会报错
         if (request.getURI().getPath().startsWith("/user/admin/")) {
@@ -200,6 +200,7 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                     response.getHeaders().add("Access-Control-Expose-Headers", "access_token");
                     response.getHeaders().add("access_token", newAccessToken);
 
+//                    设置token缓存时间并清除旧缓存
                     redisTemplate.opsForValue().set(
                             RedisHeaders.ACCESS_TOKEN + newAccessToken,
                             newToken,
@@ -252,7 +253,8 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
     }
 
     public ServerHttpRequest addHeaders(ServerHttpRequest serverHttpRequest, AuthUserDTO authUserDTO) {
-        String signatureStr = "userid=" + authUserDTO.getId() + "&username=" + authUserDTO.getUsername() + "&timestamp=" + System.currentTimeMillis();
+        long currentTimeMillis = System.currentTimeMillis();
+        String signatureStr = "userid=" + authUserDTO.getId() + "&username=" + authUserDTO.getUsername() + "&timestamp=" + currentTimeMillis;
         String signature;
         try {
             signature = HmacUtils.generateHmacSHA256(signatureStr);
@@ -264,7 +266,7 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                 .header(SecurityHeaders.USERNAME, authUserDTO.getUsername())
                 .header(SecurityHeaders.ROLES, JsonUtils.toJson(authUserDTO.getRoles()))
                 .header(SecurityHeaders.PERMISSIONS, JsonUtils.toJson(authUserDTO.getPermissions()))
-                .header(SecurityHeaders.TIMESTAMP, String.valueOf(System.currentTimeMillis()))
+                .header(SecurityHeaders.TIMESTAMP, String.valueOf(currentTimeMillis))
 //                添加用户信息签名
                 .header(SecurityHeaders.SIGNATURE, signature)
                 .build();

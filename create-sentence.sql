@@ -101,6 +101,28 @@ INSERT INTO resources (`name`, description, resource_type, resource_url,created_
 
 
 
+CREATE TABLE menu (
+	id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+	`name` VARCHAR(100) NOT NULL DEFAULT '' COMMENT '菜单名称',
+	label VARCHAR(100) NOT NULL DEFAULT '' COMMENT '前端显示名称',
+	icon VARCHAR(100) NOT NULL DEFAULT '' COMMENT '菜单图标',
+	route_path VARCHAR(200) NOT NULL DEFAULT '' COMMENT '路由路径',
+	parent_id INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '父级菜单',
+	component VARCHAR(100) NOT NULL DEFAULT '' COMMENT '组件路径',
+	perm_id INT UNSIGNED NOT NULL COMMENT '权限id',
+	perm_code VARCHAR(100) NOT NULL DEFAULT '' COMMENT '权限代码（保底策略），优先通过id查询',
+	is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否逻辑删除',
+	create_by VARCHAR(50) DEFAULT '' COMMENT '通过（管理员创建）',
+	create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+	update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+	is_public TINYINT(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '是否公开访问',
+	sort TINYINT UNSIGNED DEFAULT 50 COMMENT '排序字段'
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT='菜单表';
+
+SELECT * FROM menu
+
+
+
 CREATE DATABASE cd_file
 
 CREATE TABLE `file_info` (
@@ -113,9 +135,18 @@ CREATE TABLE `file_info` (
   `bucket_name` VARCHAR(255) NOT NULL  DEFAULT '',
   `create_by` VARCHAR(50) DEFAULT '',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP ,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ,
   `logic_delete` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  `is_public`TINYINT UNSIGNED NOT NULL DEFAULT 1
+  `is_public` TINYINT UNSIGNED NOT NULL DEFAULT 1
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+
+
+
+
+
+
+
+
 
 
 

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import common.core.entity.Resp;
 import common.core.entity.StatusCode;
 import common.core.utils.HmacUtils;
-import common.core.utils.JsonUtils;
 import common.security.entity.SecurityHeaders;
 import jakarta.annotation.Resource;
 import jakarta.servlet.*;
@@ -42,8 +41,7 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
     private ObjectMapper objectMapper;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
 
 //        放行预检请求
@@ -53,7 +51,12 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
             return;
         }
 
-        log.info(request.getRequestURI());
+//        log.error(request.getRequestURI() + " => " + !request.getRequestURI().startsWith("/user/admin/"));
+        if (!request.getRequestURI().startsWith("/user/admin/")) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            chain.doFilter(request, response);
+            return;
+        }
 
         String timestamp = request.getHeader(SecurityHeaders.TIMESTAMP);
         String username = request.getHeader(SecurityHeaders.USERNAME);
@@ -62,11 +65,7 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
         String perms = request.getHeader(SecurityHeaders.PERMISSIONS);
         String signature = request.getHeader(SecurityHeaders.SIGNATURE);
 
-//        if (!hasAuthHeaders(username, userId, roles, signature, timestamp)) {
-//            respMsg(response, "请求信息缺失", StatusCode.INTERCEPTOR_ERROR);
-//            SecurityContextHolder.clearContext();
-//            return;
-//        }
+//        log.error(username + " => " + userId + " => " + roles + " => " + signature + " => " + timestamp);
 
         if (!hasAuthHeaders(username, userId, roles, signature, timestamp)) {
             respMsg(response, "请求信息缺失", StatusCode.INTERCEPTOR_ERROR);
@@ -82,6 +81,7 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
                 return;
             }
         } catch (NumberFormatException e) {
+//            此时底层还在认证流程，抛异常不能被捕获
             respMsg(response, "非法时间格式", StatusCode.INTERCEPTOR_ERROR);
             return;
         }
@@ -90,7 +90,7 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
 //        构建签名并验证
         String signatureStr = "userid=" + userId + "&username=" + username + "&timestamp=" + timestamp;
         try {
-            boolean isValid = HmacUtils.verifyHmac(signature, signatureStr);
+            boolean isValid = HmacUtils.verifyHmac(signatureStr, signature);
             if (!isValid) {
                 respMsg(response, "签名不正确", StatusCode.INTERCEPTOR_ERROR);
                 return;
@@ -101,7 +101,7 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
         }
 
         try {
-            log.info(username + " => " + userId + " => " + roles + " => " + perms);
+//            log.info(username + " => " + userId + " => " + roles + " => " + perms);
             Authentication auth = buildAuthentication(username, roles, perms);
             SecurityContextHolder.getContext().setAuthentication(auth);
             chain.doFilter(request, response);

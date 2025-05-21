@@ -11,3 +11,5 @@
 /.idea/
 /.log/
 /.git/
+/sys-admin/.vscode/
+/sys-admin/node_modules/
