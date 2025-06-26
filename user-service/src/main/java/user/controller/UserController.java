@@ -1,5 +1,8 @@
 package user.controller;
 
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import common.config.CommonConfig;
+import common.core.annotation.RespEncrypt;
 import common.core.annotation.SysLog;
 import common.core.entity.Resp;
 import common.core.entity.StatusCode;
@@ -49,6 +52,26 @@ public class UserController {
     @Resource
     private PasswordEncoder passwordEncoder;
 
+    @Resource
+    private CommonConfig commonConfig;
+
+
+    /**
+     * 测试sentinel
+     *
+     * @return String
+     */
+    @GetMapping("/test/sentinel")
+    @SentinelResource(value = "testApi", blockHandler = "blockHandlerTest")
+    public String testSentinel() {
+        return "sentinel";
+    }
+
+    /**
+     * 用户登录
+     *
+     * @return Resp<AuthUserDTO>
+     */
     @SysLog
     @PostMapping("/auth/login")
     public Resp<AuthUserDTO> login(@RequestBody AuthUserDTO authUserDTO) {
@@ -66,6 +89,11 @@ public class UserController {
         throw new AuthException("用户名或密码错误!");
     }
 
+    /**
+     * 通过token获取用户角色和权限信息
+     *
+     * @return Resp<AuthUserDTO>
+     */
     @SysLog(explain = "通过token获取用户信息")
     @GetMapping("/access_token/{accessToken}")
     public Resp<AuthUserDTO> findByAccessToken(@PathVariable String accessToken) {
@@ -76,6 +104,11 @@ public class UserController {
         return generateAuthUserDto(user, 0);
     }
 
+    /**
+     * 修改用户信息
+     *
+     * @return Resp<String>
+     */
     @SysLog(explain = "修改用户信息")
     @PutMapping("/update")
     public Resp<String> update(@RequestBody TokenDTO tokenDTO) {
@@ -98,6 +131,12 @@ public class UserController {
                 : Resp.error("failed", StatusCode.UPDATE_ERR);
     }
 
+    /**
+     * 测试自定义PreAuthorize注解是否正常使用以及不在认证路径是否被拦截
+     *
+     * @return Resp<List < User>>
+     * 路径不为/user/admin/**，未进入认证逻辑
+     */
     //   security6.0++版本hasPermission方法最少传递两个参数
     @GetMapping("/find_all")
     @PreAuthorize("hasAnyRole('super_admin', 'admin') and hasPermission(null ,'user_view')")
@@ -111,6 +150,11 @@ public class UserController {
         return Resp.success("ok", StatusCode.SELECT_SUCCESS, userService.findAll());
     }
 
+    /**
+     * 删除用户对应的角色和权限
+     *
+     * @return Resp<AuthUserDTO>
+     */
     @GetMapping("/generate/role_perm/{id}")
     public Resp<AuthUserDTO> generateRolePermDto(@PathVariable String id) {
         if (StringUtils.isNotBlank(id)) {
@@ -128,6 +172,11 @@ public class UserController {
     }
 
 
+    /**
+     * 查找用户
+     *
+     * @return user对象
+     */
     @GetMapping("/find_by_id/{id}")
     public Resp<User> findById(@PathVariable() String id) {
         if (StringUtils.isNotBlank(id)) {
@@ -138,9 +187,30 @@ public class UserController {
             }
         }
         throw new NumberFormatException("非法id参数");
-
     }
 
+    /**
+     * 删除用户
+     *
+     * @return userid
+     */
+    @DeleteMapping("/delete_by_id/{id}")
+    public Resp<User> delById(@PathVariable() String id) {
+        if (StringUtils.isNotBlank(id)) {
+            try {
+                return Resp.success("ok", StatusCode.SELECT_SUCCESS, userService.findById(Long.parseLong(id)));
+            } catch (NumberFormatException e) {
+                throw new NumberFormatException("非法id参数" + e.getMessage());
+            }
+        }
+        throw new NumberFormatException("非法id参数");
+    }
+
+    /**
+     * 测试拦截路径 /admin/**
+     *
+     * @return userid
+     */
     @GetMapping("/admin/{id}")
     public Resp<User> admin(@PathVariable String id) {
         if (StringUtils.isNotBlank(id)) {
@@ -152,6 +222,19 @@ public class UserController {
         }
         throw new NumberFormatException("非法参数");
     }
+
+    /**
+     * 读取nacos config配置
+     *
+     * @return nacos配置的数据
+     */
+    @RespEncrypt
+    @GetMapping("/common/config")
+    public Resp<String> getConfig() {
+        System.out.println(" config key => " + commonConfig.getAesKey());
+        return Resp.success("ok", StatusCode.SELECT_SUCCESS, commonConfig.getAesKey());
+    }
+
 
     public Resp<AuthUserDTO> generateAuthUserDto(User user, int type) {
 

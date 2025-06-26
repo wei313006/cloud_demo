@@ -1,35 +1,31 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Login from '@/admin/view/Login.vue'
-import Admin from '@/admin/view/Admin.vue'
-import OperLog from '@/admin/components/OperLog.vue'
-import Manager from '@/admin/components/Manager.vue'
-import ApiDoc from '@/admin/components/ApiDoc.vue'
+import Login from '@/view/Login.vue'
+import Main from '@/view/Main.vue'
+import Home from '@/view/Home.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
-      path: '/login',
-      component: Login
-    },
-    {
-      path: '/verified/datamanager',
-      component: Admin,
+      path: '/',
+      name: 'main page',
+      component: Main, 
+      redirect:'/home',
       children: [
         {
-          path: '/verified/datamanager/operate/log',
-          component: OperLog
+          path: '/home',
+          component: Home,
         },
         {
-          path: '/verified/datamanager/managers',
-          component: Manager
-        },
-        {
-          path: '/verified/datamanager/api/doc',
-          component: ApiDoc
+          path: '/home',
+          component: Home,
         },
       ]
-    }
+    },
+    {
+      path: '/login',
+      component: Login,
+    },
   ],
 })
 

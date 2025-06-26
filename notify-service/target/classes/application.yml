@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: notice-service
+  profiles:
+    active: dev

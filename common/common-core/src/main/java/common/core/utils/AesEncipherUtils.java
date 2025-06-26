@@ -1,5 +1,8 @@
 package common.core.utils;
 
+import common.config.CommonConfig;
+import jakarta.annotation.Resource;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -13,20 +16,22 @@ import java.util.Base64;
  */
 public class AesEncipherUtils {
 
-    private static final String SECRET_KEY = "1314520qwertyuio";
-
-    // 16字节IV（初始向量），可自定义
-    private static final String INIT_VECTOR = "-zzmxqsmysyyrps-";
-
-    private static final String TRANSFORMATION = "AES/CBC/PKCS5Padding";
+//    private static final String SECRET_KEY = "1314520QWERTYUIO";
+//
+//    // 16字节IV（初始向量），可自定义
+//    private static final String INIT_VECTOR = "-ZZMXQSMYSYYRPS-";
+//
+//    private static final String TRANSFORMATION = "AES/CBC/PKCS5Padding";
 
     //    Java 默认只支持 128 位密钥   对应解密密钥长度为 16
-    public static String encrypt(String data) {
-        try {
-            IvParameterSpec iv = new IvParameterSpec(INIT_VECTOR.getBytes(StandardCharsets.UTF_8));
-            SecretKeySpec skeySpec = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), "AES");
 
-            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+
+    public static String encrypt(String aesKey, String ivKey, String pattern, String data) {
+        try {
+            IvParameterSpec iv = new IvParameterSpec(ivKey.getBytes(StandardCharsets.UTF_8));
+            SecretKeySpec skeySpec = new SecretKeySpec(aesKey.getBytes(StandardCharsets.UTF_8), "AES");
+
+            Cipher cipher = Cipher.getInstance(pattern);
             cipher.init(Cipher.ENCRYPT_MODE, skeySpec, iv);
 
             byte[] encrypted = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
@@ -37,12 +42,13 @@ public class AesEncipherUtils {
         }
     }
 
-    public static String decrypt(String encryptedData) {
+    public static String decrypt(String aesKey, String ivKey, String pattern, String encryptedData) {
         try {
-            IvParameterSpec iv = new IvParameterSpec(INIT_VECTOR.getBytes(StandardCharsets.UTF_8));
-            SecretKeySpec skeySpec = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), "AES");
 
-            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            IvParameterSpec iv = new IvParameterSpec(ivKey.getBytes(StandardCharsets.UTF_8));
+            SecretKeySpec skeySpec = new SecretKeySpec(aesKey.getBytes(StandardCharsets.UTF_8), "AES");
+
+            Cipher cipher = Cipher.getInstance(pattern);
             cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv);
 
             byte[] original = cipher.doFinal(Base64.getDecoder().decode(encryptedData));
@@ -51,16 +57,6 @@ public class AesEncipherUtils {
         } catch (Exception ex) {
             throw new RuntimeException("AES decryption error", ex);
         }
-    }
-
-    public static void main(String[] args) {
-        String originalText = "123123123321321321";
-
-        String encryptedText = encrypt(originalText);
-        System.out.println(encryptedText);
-
-        String decryptedText = decrypt(encryptedText);
-        System.out.println(decryptedText);
     }
 
 }

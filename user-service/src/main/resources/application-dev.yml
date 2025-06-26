@@ -13,6 +13,9 @@ spring:
         server-addr: localhost:8848
         metadata:
           internal-service: true
+    sentinel:
+      transport:
+        dashboard: localhost:8080
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver

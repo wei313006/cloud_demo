@@ -41,8 +41,7 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
     private ObjectMapper objectMapper;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain chain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
 
 //        放行预检请求
         if (HttpMethod.OPTIONS.matches(request.getMethod())) {
@@ -51,7 +50,7 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
             return;
         }
 
-//        log.error(request.getRequestURI() + " => " + !request.getRequestURI().startsWith("/user/admin/"));
+        log.info(request.getRequestURI() + " => " + !request.getRequestURI().startsWith("/user/admin/"));
         if (!request.getRequestURI().startsWith("/user/admin/")) {
             response.setStatus(HttpServletResponse.SC_OK);
             chain.doFilter(request, response);
@@ -86,7 +85,6 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
             return;
         }
 
-
 //        构建签名并验证
         String signatureStr = "userid=" + userId + "&username=" + username + "&timestamp=" + timestamp;
         try {
@@ -111,36 +109,29 @@ public class BaseSecurityFilter extends OncePerRequestFilter {
 
     }
 
-    private Authentication buildAuthentication(String username,
-                                               String roles, String perms) {
+    private Authentication buildAuthentication(String username, String roles, String perms) {
         List<GrantedAuthority> authorities = new ArrayList<>();
         try {
             List<String> roleList = objectMapper.readValue(roles, new TypeReference<>() {
             });
 
-            roleList.forEach(role ->
-                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
+            roleList.forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
 
             if (StringUtils.hasText(perms)) {
                 List<String> permList = objectMapper.readValue(perms, new TypeReference<>() {
                 });
-                permList.forEach(perm ->
-                        authorities.add(new SimpleGrantedAuthority("PERMISSION_" + perm)));
+                permList.forEach(perm -> authorities.add(new SimpleGrantedAuthority("PERMISSION_" + perm)));
             }
         } catch (JsonProcessingException e) {
             throw new AuthenticationServiceException("权限解析失败", e);
         }
-
+        log.info("权限详情：{}", authorities);
         return new UsernamePasswordAuthenticationToken(username, null, authorities);
     }
 
     // 自定义校验逻辑
     private boolean hasAuthHeaders(String username, String userId, String roles, String signature, String timestamp) {
-        return StringUtils.hasText(username)
-                && StringUtils.hasText(userId)
-                && StringUtils.hasText(roles)
-                && StringUtils.hasText(signature)
-                && StringUtils.hasText(timestamp);
+        return StringUtils.hasText(username) && StringUtils.hasText(userId) && StringUtils.hasText(roles) && StringUtils.hasText(signature) && StringUtils.hasText(timestamp);
     }
 
     public void respMsg(HttpServletResponse response, String msg, int code) throws IOException {

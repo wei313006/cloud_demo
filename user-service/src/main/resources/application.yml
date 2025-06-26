@@ -3,3 +3,25 @@ spring:
     name: user-service
   profiles:
     active: dev
+
+  config:
+    import:
+      - "optional:nacos:common-dev-config.yaml?group=DEFAULT_GROUP&namespace=public"
+  cloud:
+    nacos:
+      config:
+        server-addr: localhost:8848
+        file-extension: yaml
+        namespace: public
+        group: DEFAULT_GROUP
+        refresh-enabled: true
+      discovery:
+        server-addr: localhost:8848
+        namespace: public
+        group: DEFAULT_GROUP
+
+#  Spring Boot 3.x（基于Spring Framework 6）移除了对bootstrap.yml的默认支持，
+#  即使添加spring-cloud-starter-bootstrap依赖也无法恢复。
+#
+#  Spring Cloud Alibaba 2023.x（对应Spring Cloud 2023.x）要求spring.config.import必须明确指定
+#  Nacos配置的data-id、group和namespace参数，不能再通过旧版spring.cloud.nacos.config属性隐式推断。

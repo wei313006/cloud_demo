@@ -252,6 +252,9 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
                 .retryWhen(Retry.backoff(2, Duration.ofMillis(100)));
     }
 
+    /**
+     *生成请求头信息。这里为了方便添加了权限到请求头，可自行修改
+     */
     public ServerHttpRequest addHeaders(ServerHttpRequest serverHttpRequest, AuthUserDTO authUserDTO) {
         long currentTimeMillis = System.currentTimeMillis();
         String signatureStr = "userid=" + authUserDTO.getId() + "&username=" + authUserDTO.getUsername() + "&timestamp=" + currentTimeMillis;

@@ -20,6 +20,7 @@
         <module>common-security</module>
         <module>common-datasource</module>
         <module>common-feign</module>
+        <module>common-config</module>
     </modules>
 
     <properties>

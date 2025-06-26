@@ -1,0 +1,21 @@
+server:
+  port: 9095
+
+spring:
+  mail:
+    host: smtp.163.com
+    username: abing_5678@163.com
+    password: WJeV8JETZrna6c6z
+    port: 465
+    # 默认的邮件编码为UTF-8
+    default-encoding: UTF-8
+    protocol: smtp
+    # 配置SSL 加密工厂
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
+      mail.smtp.socketFactory.port: 465
+      mail.smtp.socketFactory.class: javax.net.ssl.SSLSocketFactory
+      mail.smtp.socketFactory.fallback: false
+      mail.debug: false

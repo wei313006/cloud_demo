@@ -16,7 +16,6 @@ public class HmacUtils {
 
     private static final String SECRET_KEY = "1314520qwertyuio";
 
-
     /**
      * 生成hmac签名
      */
